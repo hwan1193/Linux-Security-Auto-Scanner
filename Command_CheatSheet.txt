@@ -1,0 +1,36 @@
+========================================================================
+[Linux-Sec-Scanner] 실전 실행 명령어 모음집 (Cheat Sheet)
+========================================================================
+
+# 1. 스크립트 기본 실행 (가장 많이 쓰는 옵션)
+# - 설명: 기본 KISA 취약점 스캔을 수행하며, 결과는 /var/tmp 디렉토리에 시간순으로 생성됨.
+chmod +x secscan_rhel9_kisa.sh
+sudo ./secscan_rhel9_kisa.sh
+
+
+# 2. 파일시스템 전체 SUID/SGID 정밀 스캔 모드 (FULL_SUID_SCAN)
+# - 설명: 루트(/) 하위의 모든 SUID/SGID 파일을 샅샅이 뒤짐. (스캔 시간이 오래 걸릴 수 있음)
+# - 활용: 심층 보안 감사(Audit) 진행 시 사용
+sudo FULL_SUID_SCAN=1 ./secscan_rhel9_kisa.sh
+
+
+# 3. 점검 결과 저장 경로 지정 모드 (OUT_DIR)
+# - 설명: /var/tmp 가 아닌, 관리자가 원하는 안전한 경로(예: /root/.sec)에 결과를 저장함.
+sudo OUT_DIR=/root/.sec/secscan_$(date +%F_%H-%M-%S) ./secscan_rhel9_kisa.sh
+
+
+# 4. [중요] 점검 결과(증적 파일) 안전하게 압축 및 패키징 (tar.gz)
+# - 설명: 심사원(Auditor)에게 제출하거나, 외부로 안전하게 반출하기 위해 가장 최근 점검 결과를 압축함.
+latest=$(ls -td /var/tmp/secscan_* | head -n 1)
+sudo tar -czf "/root/secscan_result_$(date +%F_%H-%M-%S).tar.gz" -C "$latest" .
+
+
+# 5. [오류 주의] 개별 모듈(.sh) 단독 실행 금지
+# - 원인: 모듈 파일들은 메인 스크립트(secscan_rhel9_kisa.sh)에 내장된 함수(say, good, vuln)에 의존함.
+# - 에러 증상: bash 20_ssh_hardening.sh 실행 시 "say: command not found" 에러 발생.
+# - 해결: 개별 스캔이 필요하더라도 반드시 메인 스크립트(./secscan_rhel9_kisa.sh)를 통해 실행할 것.
+
+
+# [실무 팁] 점검 결과 요약본(summary)만 빠르게 확인하는 명령어
+latest=$(ls -td /var/tmp/secscan_* | head -n 1)
+cat "$latest/summary.txt"
