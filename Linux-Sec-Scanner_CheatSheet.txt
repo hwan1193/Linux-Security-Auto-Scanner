@@ -1,0 +1,75 @@
+========================================================================
+Linux-Sec-Scanner 실전 실행 명령어 모음집 (Cheat Sheet)
+========================================================================
+
+[0] 기본 전제
+- 본 치트시트는 Rocky/RHEL 9 계열 보안 점검 스크립트(secscan_rhel9_kisa) 기준
+- 모듈(modules/*.sh)은 단독 실행 금지(메인 스크립트의 공통 함수 의존)
+- 실행 결과는 기본적으로 /var/tmp/secscan_YYYY-MM-DD_HH-MM-SS/ 에 생성됨
+  - summary.txt / scan.log / artifacts/*
+
+-----------------------------------------------------------------------
+[1] 기본 실행 (가장 많이 쓰는 옵션)
+-----------------------------------------------------------------------
+chmod +x ./secscan_rhel9_kisa/secscan_rhel9_kisa.sh
+sudo ./secscan_rhel9_kisa/secscan_rhel9_kisa.sh
+
+-----------------------------------------------------------------------
+[2] 파일시스템 전체 SUID/SGID 정밀 스캔 모드 (FULL_SUID_SCAN)
+- 루트(/) 하위의 모든 SUID/SGID 파일을 탐색 (시간 오래 걸릴 수 있음)
+- 심층 보안 감사(Audit) 진행 시 사용
+-----------------------------------------------------------------------
+FULL_SUID_SCAN=1 sudo ./secscan_rhel9_kisa/secscan_rhel9_kisa.sh
+
+-----------------------------------------------------------------------
+[3] 점검 결과 저장 경로 지정 (OUT_DIR)
+- /var/tmp 대신 원하는 안전한 경로(예: /root/.sec)에 결과 저장
+-----------------------------------------------------------------------
+OUT_DIR=/root/.sec/secscan_$(date +%F_%H-%M-%S) sudo ./secscan_rhel9_kisa/secscan_rhel9_kisa.sh
+
+-----------------------------------------------------------------------
+[4] [중요] 점검 결과(증적 파일) 압축 패키징 (tar.gz)
+- Auditor 제출/외부 반출 대비용: 가장 최근 점검 결과를 압축
+-----------------------------------------------------------------------
+latest=$(ls -td /var/tmp/secscan_* | head -n 1)
+sudo tar -czf "/root/secscan_result_$(date +%F_%H-%M-%S).tar.gz" -C "$latest" .
+ls -al /root/secscan_result_*.tar.gz
+
+-----------------------------------------------------------------------
+[5] 요약본(summary)만 빠르게 확인
+-----------------------------------------------------------------------
+latest=$(ls -td /var/tmp/secscan_* | head -n 1)
+cat "$latest/summary.txt"
+
+-----------------------------------------------------------------------
+[6] [오류 주의] 개별 모듈(.sh) 단독 실행 금지
+- 원인: modules/*.sh는 메인 스크립트 내 함수(say, good, vuln, warn)에 의존
+- 에러 예시: bash 20_ssh_hardening.sh -> "say: command not found"
+- 해결: 필요한 경우에도 반드시 메인 스크립트로 실행
+-----------------------------------------------------------------------
+sudo ./secscan_rhel9_kisa/secscan_rhel9_kisa.sh
+
+-----------------------------------------------------------------------
+[Troubleshooting] 55_file_permissions.sh bash octal 오류(0o###) 복구/수정
+- 증상: value too great for base (error token is "0o002" / "0o020")
+- 원인: bash 산술식에서 python-style octal(0o###) 미지원
+- 조치: 55번 모듈 원본 복구 후 0o### -> 0### 변환
+-----------------------------------------------------------------------
+
+# 1) 55번 모듈 원본으로 복구(zip에서 다시 꺼냄)
+unzip -p /home/azureuser/secscan_rhel9_kisa_plus4.zip secscan_rhel9_kisa/modules/55_file_permissions.sh \
+  > /root/secscan_rhel9_kisa/modules/55_file_permissions.sh
+
+# 2) 0o### -> 0### 변환 (bash 호환 옥탈)
+sed -i -E 's/0o([0-7]+)/0\1/g' /root/secscan_rhel9_kisa/modules/55_file_permissions.sh
+
+# 3) 남은 0o 있는지 확인 + 실행권한
+grep -n '0o' /root/secscan_rhel9_kisa/modules/55_file_permissions.sh || echo "OK (no 0o left)"
+chmod +x /root/secscan_rhel9_kisa/modules/55_file_permissions.sh
+
+# 4) 다시 실행(정상 여부 확인)
+sudo ./secscan_rhel9_kisa/secscan_rhel9_kisa.sh
+
+========================================================================
+-끝-
+========================================================================
