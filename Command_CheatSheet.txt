@@ -33,4 +33,19 @@ sudo tar -czf "/root/secscan_result_$(date +%F_%H-%M-%S).tar.gz" -C "$latest" .
 
 # [실무 팁] 점검 결과 요약본(summary)만 빠르게 확인하는 명령어
 latest=$(ls -td /var/tmp/secscan_* | head -n 1)
+
 cat "$latest/summary.txt"
+
+# 55번 모듈 "원본으로 복구" (zip에서 다시 꺼냄. 기존<=>신규)
+unzip -p /home/azureuser/secscan_rhel9_kisa_plus4.zip secscan_rhel9_kisa/modules/55_file_permissions.sh \
+  > /root/secscan_rhel9_kisa/modules/55_file_permissions.sh
+
+# - 원인: 0o002, 0o020 으로 bash 용 옥탈로 일괄 변환 (0o### → 0### 로 바꿈)
+sed -i -E 's/0o([0-7]+)/0\1/g' /root/secscan_rhel9_kisa/modules/55_file_permissions.sh
+
+# 남은 0o 있는지 확인 + 실행권한
+grep -n '0o' /root/secscan_rhel9_kisa/modules/55_file_permissions.sh || echo "OK (no 0o left)"
+chmod +x /root/secscan_rhel9_kisa/modules/55_file_permissions.sh
+
+# 다시 실행 (에러 없는지 정상인지 확인)
+./secscan_rhel9_kisa/secscan_rhel9_kisa.sh
