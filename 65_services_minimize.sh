@@ -1,68 +1,30 @@
-\
 #!/usr/bin/env bash
 set -euo pipefail
 
 say "[65] 불필요 서비스 활성화 여부 점검 (enabled/active)"
 
-EN_FILE="$ARTIFACTS/enabled_units.txt"
-AC_FILE="$ARTIFACTS/active_units.txt"
+ENABLED_OUT="$ARTIFACTS/enabled_units.txt"
+ACTIVE_OUT="$ARTIFACTS/active_units.txt"
 
-: > "$EN_FILE"
-: > "$AC_FILE"
+: > "$ENABLED_OUT"
+: > "$ACTIVE_OUT"
 
-if ! command -v systemctl >/dev/null 2>&1; then
-  warn "systemctl 없음. 서비스 점검 스킵"
-  exit 0
+systemctl list-unit-files --state=enabled > "$ENABLED_OUT" 2>/dev/null || true
+systemctl list-units --type=service --state=running > "$ACTIVE_OUT" 2>/dev/null || true
+
+info "enabled units saved: $ENABLED_OUT"
+info "active units saved:  $ACTIVE_OUT"
+
+# 1) rpcbind 확인
+if grep -q '^rpcbind\.service' "$ENABLED_OUT" || grep -q '^rpcbind\.socket' "$ENABLED_OUT"; then
+  warn_k "rpcbind_enabled" "서비스 활성화 확인: rpcbind.socket (운영 필요성 검토). 미사용 시 disable 권장"
+else
+  good_k "rpcbind_enabled" "rpcbind 비활성 또는 미사용"
 fi
 
-# Evidence
-systemctl list-unit-files --type=service --state=enabled > "$EN_FILE" 2>/dev/null || true
-systemctl list-unit-files --type=socket  --state=enabled >> "$EN_FILE" 2>/dev/null || true
-systemctl list-units --type=service --state=running > "$AC_FILE" 2>/dev/null || true
-systemctl list-units --type=socket  --state=running >> "$AC_FILE" 2>/dev/null || true
-
-info "enabled units saved: $EN_FILE"
-info "active units saved:  $AC_FILE"
-
-# Risky units (common)
-RISK_VULN=(
-  telnet.socket
-  rsh.socket
-  rlogin.socket
-  rexec.socket
-  tftp.service
-  tftp.socket
-  xinetd.service
-)
-RISK_WARN=(
-  rpcbind.service
-  rpcbind.socket
-  avahi-daemon.service
-  cups.service
-  nfs-server.service
-  smb.service
-  nmb.service
-  snmpd.service
-  vsftpd.service
-)
-
-is_enabled() { systemctl is-enabled "$1" >/dev/null 2>&1; }
-is_active()  { systemctl is-active "$1"  >/dev/null 2>&1; }
-
-for u in "${RISK_VULN[@]}"; do
-  if systemctl list-unit-files | awk '{print $1}' | grep -qx "$u"; then
-    if is_enabled "$u" || is_active "$u"; then
-      vuln "고위험 서비스 활성화 발견: $u (enabled/active). 미사용 시 disable 권장"
-    fi
-  fi
-done
-
-for u in "${RISK_WARN[@]}"; do
-  if systemctl list-unit-files | awk '{print $1}' | grep -qx "$u"; then
-    if is_enabled "$u" || is_active "$u"; then
-      warn "서비스 활성화 확인: $u (운영 필요성 검토). 미사용 시 disable 권장"
-    fi
-  fi
-done
-
-good "서비스 점검 완료 (증적: enabled/active 목록 저장)"
+# 2) 전체 enabled 서비스 목록 존재 여부
+if [[ -s "$ENABLED_OUT" ]]; then
+  good_k "enabled_services_review" "서비스 점검 완료 (증적: enabled/active 목록 저장)"
+else
+  warn_k "enabled_services_review" "enabled 서비스 목록을 가져오지 못함"
+fi
