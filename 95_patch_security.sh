@@ -1,4 +1,3 @@
-\
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -8,7 +7,8 @@ OUT="$ARTIFACTS/patch_security_status.txt"
 : > "$OUT"
 
 if ! command -v dnf >/dev/null 2>&1; then
-  warn "dnf 없음. 패치 점검 스킵"
+ ## warn "dnf 없음. 패치 점검 스킵"
+   warn_k "dnf_present" "dnf 없음. 패치 점검 스킵"
   exit 0
 fi
 
@@ -43,20 +43,24 @@ if [[ -s "$SEC_FILE" ]]; then
   # filter out header lines if any
   lines=$(grep -Ev '^(Last metadata expiration check|Loaded plugins|Available|Updates)' "$SEC_FILE" | wc -l | tr -d ' ')
   if [[ "${lines:-0}" -gt 0 ]]; then
-    warn "적용 가능한 보안 업데이트 항목이 있을 수 있음. 패치 윈도우 내 검토 권장"
+   ## warn "적용 가능한 보안 업데이트 항목이 있을 수 있음. 패치 윈도우 내 검토 권장"
+    warn_k "security_updates" "적용 가능한 보안 업데이트 항목이 있을 수 있음. 패치 윈도우 내 검토 권장"
   else
-    good "보안 업데이트 목록이 비어있음(또는 메타데이터 헤더만 존재)"
+    ## good "보안 업데이트 목록이 비어있음(또는 메타데이터 헤더만 존재)"
+    good_k "security_updates" "적용 가능한 보안 업데이트 항목 없음"
   fi
 else
-  warn "보안 업데이트 정보를 가져오지 못했거나(레포/메타데이터) 항목이 없음"
+ ## warn "보안 업데이트 정보를 가져오지 못했거나(레포/메타데이터) 항목이 없음"
+  warn_k "security_updates" "보안 업데이트 정보를 가져오지 못했거나(레포/메타데이터) 항목이 없음"
 fi
 
 # Optional: reboot required check (if tool exists)
 if command -v needs-restarting >/dev/null 2>&1; then
   if needs-restarting -r >/dev/null 2>&1; then
-    good "reboot required 아님"
+   ## good "reboot required 아님"
+    good_k "reboot_required" "reboot required 아님"
   else
-    warn "reboot 필요 상태일 수 있음(needs-restarting -r). 점검 권장"
+    ## warn "reboot 필요 상태일 수 있음(needs-restarting -r). 점검 권장"
+    warn_k "reboot_required" "reboot 필요 상태일 수 있음(needs-restarting -r). 점검 권장"
   fi
 fi
-
