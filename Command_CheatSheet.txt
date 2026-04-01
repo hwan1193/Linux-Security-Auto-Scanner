@@ -49,3 +49,10 @@ chmod +x /root/secscan_rhel9_kisa/modules/55_file_permissions.sh
 
 # 다시 실행 (에러 없는지 정상인지 확인)
 ./secscan_rhel9_kisa/secscan_rhel9_kisa.sh
+
+
+## latest=$(ls -td /var/tmp/secscan_* | head -n 1)
+## cat "$latest/results.ndjson"
+##
+## cat "$latest/results.ndjson" | grep -E 'rpcbind_enabled|enabled_services_review|selinux_status|auditd_present|audit_rules_present'
+
