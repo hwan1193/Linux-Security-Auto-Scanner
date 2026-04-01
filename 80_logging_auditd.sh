@@ -3,23 +3,34 @@ set -euo pipefail
 
 say "[80] 로그/감사(auditd/rsyslog) 점검"
 
-# rsyslog
-if command -v systemctl >/dev/null 2>&1; then
-  if systemctl list-unit-files | grep -q '^rsyslog\.service'; then
-    st="$(systemctl is-active rsyslog 2>/dev/null || true)"
-    [[ "$st" == "active" ]] && good "rsyslog 활성" || warn "rsyslog 상태: ${st:-unknown}"
-  fi
-  if systemctl list-unit-files | grep -q '^auditd\.service'; then
-    st="$(systemctl is-active auditd 2>/dev/null || true)"
-    [[ "$st" == "active" ]] && good "auditd 활성" || warn "auditd 상태: ${st:-unknown}"
+AUDIT_RULES_OUT="$ARTIFACTS/audit_rules_concat.rules"
+: > "$AUDIT_RULES_OUT"
+
+# 1) auditd 서비스 확인
+if systemctl list-unit-files 2>/dev/null | grep -q '^auditd\.service'; then
+  if systemctl is-active auditd >/dev/null 2>&1; then
+    good_k "auditd_present" "auditd.service 활성"
   else
-    warn "auditd.service 없음(미설치 가능)"
+    warn_k "auditd_present" "auditd.service 설치되어 있으나 비활성"
   fi
+else
+  warn_k "auditd_present" "auditd.service 없음(미설치 가능)"
 fi
 
-# audit rules evidence
+# 2) audit rule 수집
 if [[ -d /etc/audit/rules.d ]]; then
-  ls -al /etc/audit/rules.d > "$ARTIFACTS/audit_rules_ls.txt" 2>/dev/null || true
-  cat /etc/audit/rules.d/*.rules > "$ARTIFACTS/audit_rules_concat.rules" 2>/dev/null || true
-  say "  [*] audit rules saved: $ARTIFACTS/audit_rules_concat.rules"
+  cat /etc/audit/rules.d/*.rules >> "$AUDIT_RULES_OUT" 2>/dev/null || true
+fi
+
+if [[ -f /etc/audit/audit.rules ]]; then
+  cat /etc/audit/audit.rules >> "$AUDIT_RULES_OUT" 2>/dev/null || true
+fi
+
+info "audit rules saved: $AUDIT_RULES_OUT"
+
+# 3) audit rule 존재 여부
+if [[ -s "$AUDIT_RULES_OUT" ]]; then
+  good_k "audit_rules_present" "audit rules 존재"
+else
+  warn_k "audit_rules_present" "audit rules 미확인"
 fi
