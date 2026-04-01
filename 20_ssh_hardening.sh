@@ -4,7 +4,8 @@ set -euo pipefail
 say "[20] SSH 하드닝 (U-01 포함)"
 
 if ! command -v sshd >/dev/null 2>&1; then
-  warn "sshd 미설치 가능. SSH 점검 스킵"
+ ## warn "sshd 미설치 가능. SSH 점검 스킵"
+  warn_k "sshd_present" "sshd 미설치 가능. SSH 점검 스킵"
   exit 0
 fi
 
@@ -15,7 +16,8 @@ sshd -T -C user=root,host="$(hostname)",addr=127.0.0.1 > "$EFF_FILE" 2>/dev/null
 if [[ -s "$EFF_FILE" ]]; then
   say "  [*] sshd effective config saved: $EFF_FILE"
 else
-  warn "sshd -T 결과를 만들지 못함. 설정 파일 기반 확인 필요"
+  ##warn "sshd -T 결과를 만들지 못함. 설정 파일 기반 확인 필요"
+  warn_k "sshd_effective_config" "sshd -T 결과를 만들지 못함. 설정 파일 기반 확인 필요"
 fi
 
 get_eff() {
@@ -28,30 +30,42 @@ prl="$(get_eff permitrootlogin || true)"
 if [[ -n "$prl" ]]; then
   say "  [*] permitrootlogin=$prl"
   case "$prl" in
-    no) good "Root SSH 로그인 차단(PermitRootLogin no)";;
+    ##no) good "Root SSH 로그인 차단(PermitRootLogin no)";;
+    ##prohibit-password|without-password)
+      ##warn "Root 키로그인은 허용($prl). 정책이 'no'면 취약 판정 필요";;
+    ##yes) vuln "Root SSH 로그인 허용(permitrootlogin yes)";;
+    ##*) warn "permitrootlogin 값 비표준: $prl";;
+
+    no) good_k "root_ssh" "Root SSH 로그인 차단(PermitRootLogin no)";;
     prohibit-password|without-password)
-      warn "Root 키로그인은 허용($prl). 정책이 'no'면 취약 판정 필요";;
-    yes) vuln "Root SSH 로그인 허용(permitrootlogin yes)";;
-    *) warn "permitrootlogin 값 비표준: $prl";;
+      warn_k "root_ssh" "Root 키로그인은 허용($prl). 정책이 'no'면 취약 판정 필요";;
+    yes) vuln_k "root_ssh" "Root SSH 로그인 허용(permitrootlogin yes)";;
+    *) warn_k "root_ssh" "permitrootlogin 값 비표준: $prl";;
+
   esac
 else
-  warn "permitrootlogin 값을 확인 못함"
+  #warn "permitrootlogin 값을 확인 못함"
+  warn_k "root_ssh" "permitrootlogin 값을 확인 못함"
 fi
 
 # PasswordAuthentication
 pa="$(get_eff passwordauthentication || true)"
 if [[ "$pa" == "no" ]]; then
-  good "PasswordAuthentication 비활성(no)"
+  ##good "PasswordAuthentication 비활성(no)"
+  good_k "password_auth" "PasswordAuthentication 비활성(no)"
 elif [[ -n "$pa" ]]; then
-  warn "PasswordAuthentication=$pa (키 기반 강제면 no 권장)"
+  ##warn "PasswordAuthentication=$pa (키 기반 강제면 no 권장)"
+  warn_k "password_auth" "PasswordAuthentication=$pa (키 기반 강제면 no 권장)"
 fi
 
 # PermitEmptyPasswords
 pep="$(get_eff permitemptypasswords || true)"
 if [[ "$pep" == "no" ]]; then
-  good "빈 비밀번호 로그인 차단(permitEmptyPasswords no)"
+  ##good "빈 비밀번호 로그인 차단(permitEmptyPasswords no)"
+  good_k "empty_passwords" "빈 비밀번호 로그인 차단(permitEmptyPasswords no)"
 elif [[ -n "$pep" ]]; then
-  vuln "빈 비밀번호 로그인 허용 가능성(permitEmptyPasswords=$pep)"
+  ##vuln "빈 비밀번호 로그인 허용 가능성(permitEmptyPasswords=$pep)"
+  vuln_k "empty_passwords" "빈 비밀번호 로그인 허용 가능성(permitEmptyPasswords=$pep)"
 fi
 
 # MaxAuthTries
